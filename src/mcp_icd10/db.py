@@ -6,8 +6,6 @@ full-text search on first run. Subsequent runs use the cached DB.
 
 import csv
 import gzip
-import hashlib
-import io
 import sqlite3
 from pathlib import Path
 
@@ -18,8 +16,8 @@ _DB_PATH = _DATA_DIR / "icd10cm.db"
 _connection: sqlite3.Connection | None = None
 
 
-def _parse_description(raw: str) -> tuple[str, str, str]:
-    """Parse enhanced description into (category_code, category_desc, description).
+def _parse_description(raw: str) -> tuple[str, str]:
+    """Parse enhanced description into (category_desc, description).
 
     Input format: "Header: A00 - Cholera | Specific long description about this code: ..."
     Note: The header field from the source CSV can be inaccurate (it tracks the
