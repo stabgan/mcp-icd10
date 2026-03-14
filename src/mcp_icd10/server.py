@@ -1,90 +1,128 @@
-"""MCP server for offline ICD-10-CM code lookup.
+"""MCP server for offline ICD code lookup.
 
 Zero API keys. Zero network calls. Zero data leakage.
-All 74,260 ICD-10-CM codes embedded locally with full-text search.
+124K codes across ICD-10-CM, ICD-9-CM, ICD-10 WHO + 102K GEMs crosswalk mappings.
 """
 
 from mcp.server.fastmcp import FastMCP
-
 from mcp_icd10 import db
 
 mcp = FastMCP(
-    "mcp-icd10",
-    instructions="Offline ICD-10-CM medical code lookup with full-text search. "
-    "74,260 codes, zero network calls, instant results.",
+    "mcp-icd",
+    instructions=(
+        "Offline medical code lookup: ICD-10-CM, ICD-9-CM, ICD-10 WHO. "
+        "GEMs crosswalk for ICD-9↔ICD-10 translation. "
+        "124K codes, 102K mappings, zero network calls."
+    ),
 )
 
 
 @mcp.tool()
-def lookup_code(code: str) -> str:
-    """Look up an ICD-10-CM code and return its description.
+def lookup_code(code: str, system: str = "") -> str:
+    """Look up a medical code and return its description.
 
     Args:
-        code: ICD-10-CM code (e.g., 'E11.9', 'E119', 'A000'). Dots are optional.
-
-    Returns:
-        Code details including description and category, or 'not found' message.
+        code: Medical code (e.g., 'E11.9', '250.00'). Dots optional.
+        system: 'icd10cm', 'icd9cm', or 'icd10who'. Empty = search all.
     """
-    result = db.lookup_code(code)
-    if not result:
-        return f"Code '{code}' not found. Try search_codes() to find the right code."
-    return (
-        f"Code: {result['code']}\n"
-        f"Description: {result['description']}\n"
-        f"Category: {result['category_code']}"
+    sys_f = system.lower().strip() or None
+    if sys_f and sys_f not in db.SYSTEMS:
+        return f"Unknown system '{system}'. Valid: {', '.join(db.SYSTEMS)}"
+
+    results = [db.lookup_code(code, sys_f)] if sys_f else db.lookup_code_all_systems(code)
+    results = [r for r in results if r]
+    if not results:
+        return f"Code '{code}' not found. Try search_codes() to find it."
+    return "\n".join(
+        f"[{r['system']}] {r['code']}: {r['description']}" for r in results
     )
 
 
 @mcp.tool()
-def search_codes(query: str, limit: int = 20) -> str:
-    """Search ICD-10-CM codes by clinical description using full-text search.
-
-    Supports natural language queries like 'type 2 diabetes with kidney disease'
-    or 'acute myocardial infarction'. Uses BM25 ranking for relevance.
+def search_codes(query: str, system: str = "", limit: int = 20) -> str:
+    """Search codes by clinical description using full-text search.
 
     Args:
-        query: Clinical description or keywords to search for.
-        limit: Maximum number of results (default 20, max 50).
-
-    Returns:
-        Ranked list of matching ICD-10-CM codes with descriptions.
+        query: Clinical description or keywords (e.g., 'type 2 diabetes').
+        system: 'icd10cm', 'icd9cm', or 'icd10who'. Empty = all systems.
+        limit: Max results (default 20, max 50).
     """
+    sys_f = system.lower().strip() or None
+    if sys_f and sys_f not in db.SYSTEMS:
+        return f"Unknown system '{system}'. Valid: {', '.join(db.SYSTEMS)}"
     limit = min(max(1, limit), 50)
-    results = db.search_codes(query, limit)
+    results = db.search_codes(query, sys_f, limit)
     if not results:
-        return f"No codes found for '{query}'. Try different keywords or broader terms."
+        return f"No codes found for '{query}'. Try broader terms."
     lines = [f"Found {len(results)} result(s) for '{query}':\n"]
     for r in results:
-        lines.append(
-            f"  {r['code']}: {r['description']}"
-        )
+        lines.append(f"  [{r['system']}] {r['code']}: {r['description']}")
     return "\n".join(lines)
 
 
 @mcp.tool()
-def browse_category(prefix: str, limit: int = 50) -> str:
-    """Browse all ICD-10-CM codes under a category prefix.
+def browse_category(prefix: str, system: str = "icd10cm", limit: int = 50) -> str:
+    """Browse all codes under a category prefix.
 
     Args:
-        prefix: Category prefix (e.g., 'E11' for Type 2 diabetes, 'I25' for chronic ischemic heart disease).
-        limit: Maximum number of results (default 50, max 100).
-
-    Returns:
-        List of all codes under the given category prefix.
+        prefix: Category prefix (e.g., 'E11', 'I25', '250').
+        system: 'icd10cm' (default), 'icd9cm', or 'icd10who'.
+        limit: Max results (default 50, max 100).
     """
+    sys_f = system.lower().strip()
+    if sys_f not in db.SYSTEMS:
+        return f"Unknown system '{system}'. Valid: {', '.join(db.SYSTEMS)}"
     limit = min(max(1, limit), 100)
-    results = db.browse_category(prefix, limit)
+    results = db.browse_category(prefix, sys_f, limit)
     if not results:
-        return f"No codes found with prefix '{prefix}'."
-    lines = [f"Found {len(results)} code(s) under '{prefix}':\n"]
+        return f"No codes under '{prefix}' in {sys_f}."
+    lines = [f"{len(results)} code(s) under '{prefix}' [{sys_f}]:\n"]
     for r in results:
         lines.append(f"  {r['code']}: {r['description']}")
     return "\n".join(lines)
 
 
+@mcp.tool()
+def translate_code(code: str, source_system: str = "") -> str:
+    """Translate between ICD-9-CM and ICD-10-CM using GEMs crosswalk.
+
+    Args:
+        code: Source code (e.g., '250.00' for ICD-9, 'E119' for ICD-10-CM).
+        source_system: 'icd9cm' or 'icd10cm'. Empty = auto-detect.
+    """
+    src = source_system.lower().strip() or None
+    if src and src not in ("icd9cm", "icd10cm"):
+        return "GEMs only supports 'icd9cm' and 'icd10cm'."
+    results = db.crosswalk(code, src)
+    if not results:
+        return f"No crosswalk mappings for '{code}'."
+    lines = [f"Crosswalk for '{code}':\n"]
+    for r in results:
+        flags = []
+        if r["approximate"]: flags.append("≈")
+        if r["no_map"]: flags.append("no-map")
+        if r["combination"]: flags.append("combo")
+        flag_s = f" [{','.join(flags)}]" if flags else ""
+        desc = f" — {r['target_description']}" if r["target_description"] else ""
+        lines.append(f"  {r['source_code']} → [{r['target_system']}] {r['target_code']}{desc}{flag_s}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def get_stats() -> str:
+    """Database statistics: code counts per system and crosswalk mappings."""
+    s = db.get_stats()
+    return (
+        f"ICD-10-CM: {s['icd10cm']:,} codes\n"
+        f"ICD-9-CM:  {s['icd9cm']:,} codes\n"
+        f"ICD-10 WHO: {s['icd10who']:,} codes\n"
+        f"GEMs crosswalk: {s['crosswalk_mappings']:,} mappings\n"
+        f"Total: {s['total_codes']:,} codes"
+    )
+
+
 def main():
     mcp.run()
-
 
 if __name__ == "__main__":
     main()

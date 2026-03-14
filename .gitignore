@@ -3,6 +3,6 @@ __pycache__/
 .venv/
 dist/
 *.egg-info/
-src/mcp_icd10/data/icd10cm.db
+src/mcp_icd10/data/*.db
 .python-version
 uv.lock

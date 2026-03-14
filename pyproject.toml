@@ -1,12 +1,12 @@
 [project]
 name = "mcp-icd10"
-version = "0.1.0"
-description = "Offline, local MCP server for ICD-10-CM medical code lookup. Zero API keys. Zero network calls. Zero data leakage."
+version = "0.2.0"
+description = "Offline MCP server for ICD-10-CM, ICD-9-CM, ICD-10 WHO code lookup with GEMs crosswalk. Zero API keys. Zero network calls. Zero data leakage."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [{name = "stabgan"}]
-keywords = ["mcp", "icd10", "medical", "coding", "healthcare", "offline", "llm"]
+keywords = ["mcp", "icd10", "icd9", "medical", "coding", "healthcare", "offline", "llm", "crosswalk", "gems"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Healthcare Industry",
