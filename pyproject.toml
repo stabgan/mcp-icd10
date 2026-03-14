@@ -1,0 +1,30 @@
+[project]
+name = "mcp-icd10"
+version = "0.1.0"
+description = "Offline, local MCP server for ICD-10-CM medical code lookup. Zero API keys. Zero network calls. Zero data leakage."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [{name = "stabgan"}]
+keywords = ["mcp", "icd10", "medical", "coding", "healthcare", "offline", "llm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "mcp[cli]>=1.0.0",
+]
+
+[project.scripts]
+mcp-icd10 = "mcp_icd10.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_icd10"]
